@@ -1,9 +1,10 @@
 #include <Servo.h>
+#include <Wire.h>
 
 const int kastStep = 13;
 const int kastDir = 12;
 const int ms1 = 11;
-const int laser = 10;
+//const int laser = 10;
 
 const int sjokksensor = 8;
 const int knappKast = 7;
@@ -13,20 +14,29 @@ const int knappLast = 5;
 const int endebryter = 3;
 
 const int servoPot = A0;
-const int potutkastStep = A1;
+const int potKastStep = A1;
 
 const float graderPrStep = 1.8;
-
-
+float fKastGrader;
 
 Servo servo;
 int servoPos;
+
+int slaveAdresse = 2;
+
+float data[] = {};
 
 
 // int stepTid = 500;  //mikrosekund
 
 
 void setup() {
+
+  Serial.begin(9600);
+  Serial.println("Programmet starter...");
+
+  Wire.begin();
+
   for (int i = 10; i <= 13; i++) {
     pinMode(i, OUTPUT);
   }
@@ -38,27 +48,48 @@ void setup() {
   }
 
   pinMode(servoPot, INPUT);
-  pinMode(potutkastStep, INPUT);
-
-
-
-
-  Serial.begin(9600);
-
+  pinMode(potKastStep, INPUT);
 
   digitalWrite(ms1, LOW);
+
+  Serial.println("Programmet er startet!");
 }
 
 void loop() {
+  Serial.println("");
+  delay(500);
+
   int servoPos = map(analogRead(servoPot), 0, 1023, 0, 180);
   servo.write(servoPos);
-  //Serial.println("loop");
 
-  int utkastStep = map(analogRead(potutkastStep), 0, 1023, 100, 0);
-  //Serial.println(utkastStep);                           
-  float utkastGrader = utkastStep * graderPrStep;
-  Serial.println(utkastGrader); // Kan denne sendes til arduino 2?
-  
+  int KastStep = map(analogRead(potKastStep), 0, 1023, 100, 0);
+  float fKastGrader = KastStep * graderPrStep;
+
+  //Serial.println(fKastGrader); // Kan denne sendes til arduino 2?
+
+  data[0] = servoPos;
+  data[1] = fKastGrader;
+  Serial.print(data[0]);
+  Serial.print("\t");
+  Serial.println(data[1]);
+
+
+
+
+  /////////////////////////////////////
+  int verdi = data[0];
+  // Send data to-tre ganger i sekundet              /// BRUK EN FOR LOOP FOR Å SENDE EN BYTE OM GANGEN, MÅ GJØRES OM FRA FLOAT FØRST
+  Wire.beginTransmission(slaveAdresse);
+  Wire.write(verdi);
+  Wire.endTransmission();
+  //  Serial.println("Sender servoPos til slave");
+
+  //////////////////////////////////////////////////////
+
+
+
+
+
 
   if (digitalRead(knappKast) == LOW) {
     kast();
@@ -73,10 +104,10 @@ void kast() {
   Serial.println("Kaster");
   digitalWrite(kastDir, LOW);
   digitalWrite(ms1, LOW);
-  
-  int utkastStep = map(analogRead(potutkastStep), 0, 1023, 100, 0);
- 
-  for (int i = 0; i < utkastStep; i++) {
+
+  int KastStep = map(analogRead(potKastStep), 0, 1023, 100, 0);
+
+  for (int i = 0; i < KastStep; i++) {
 
     digitalWrite(kastStep, HIGH);
     delayMicroseconds(500);
@@ -107,16 +138,17 @@ void lastProsjektil() {
       delay(1000);
 
       if (endebryterNaad == true) {
+        //return;
         digitalWrite(kastDir, LOW);
         digitalWrite(ms1, HIGH);
 
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 30; i++) {  // Kjører litt opp etter endebryteren er nådd.
           digitalWrite(kastStep, HIGH);
           delayMicroseconds(1000);
           digitalWrite(kastStep, LOW);
           delayMicroseconds(1000);
         }
-        Serial.println("kjorer litt opp");      // Kunne ikke ha denne i for-loopen fordi Arduinoen er for treg (skapte ulyd og lav fart)
+        Serial.println("kjorer litt opp");  // Kunne ikke ha denne i for-loopen fordi Arduinoen er for treg (skapte ulyd og lav fart)
       }
       endebryterNaad = !endebryterNaad;
       delay(1000);
