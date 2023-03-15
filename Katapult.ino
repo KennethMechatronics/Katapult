@@ -1,16 +1,13 @@
 #include <Servo.h>
 #include <Wire.h>
 
-const int kastStep = 13;
-const int kastDir = 12;
+const int step = 13;
+const int dir = 12;
 const int ms1 = 11;
-//const int laser = 10;
 
-const int sjokksensor = 8;
 const int knappKast = 7;
-//const int knappOK = 6;
 const int knappLast = 5;
-//const int knappVerdiNed = 4;
+
 const int endebryter = 3;
 
 const int servoPot = A0;
@@ -21,13 +18,17 @@ float fKastGrader;
 
 Servo servo;
 int servoPos;
+const int servoNullpunkt = 100;
 
 int slaveAdresse = 2;
 
-float data[] = {};
+int data[] = {};
+int dataArrayStorrelse = 2;
+ 
 
+unsigned long fortid;
+const int intervallDatasending = 700;
 
-// int stepTid = 500;  //mikrosekund
 
 
 void setup() {
@@ -36,6 +37,7 @@ void setup() {
   Serial.println("Programmet starter...");
 
   Wire.begin();
+
 
   for (int i = 10; i <= 13; i++) {
     pinMode(i, OUTPUT);
@@ -56,35 +58,30 @@ void setup() {
 }
 
 void loop() {
-  Serial.println("");
-  delay(500);
+  unsigned long naatid = millis();
 
   int servoPos = map(analogRead(servoPot), 0, 1023, 0, 180);
   servo.write(servoPos);
 
-  int KastStep = map(analogRead(potKastStep), 0, 1023, 100, 0);
-  float fKastGrader = KastStep * graderPrStep;
+  int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);
+  float fKastGrader = antStepKast * graderPrStep;
 
-  //Serial.println(fKastGrader); // Kan denne sendes til arduino 2?
+  //Serial.println(data[1]);
 
-  data[0] = servoPos;
-  data[1] = fKastGrader;
-  Serial.print(data[0]);
-  Serial.print("\t");
-  Serial.println(data[1]);
+  if (naatid - fortid >= intervallDatasending) {
+    fortid = naatid;
 
+    byte bKastGrader = fKastGrader;
+    byte bServoPos = servoPos;
+    data[0] = bServoPos;
+    data[1] = bKastGrader;
 
+    Wire.beginTransmission(slaveAdresse);
+    Wire.write(data[1]);
+    Wire.endTransmission();
+    Serial.println("Sender bServoPos til slave");
+  }
 
-
-  /////////////////////////////////////
-  int verdi = data[0];
-  // Send data to-tre ganger i sekundet              /// BRUK EN FOR LOOP FOR Å SENDE EN BYTE OM GANGEN, MÅ GJØRES OM FRA FLOAT FØRST
-  Wire.beginTransmission(slaveAdresse);
-  Wire.write(verdi);
-  Wire.endTransmission();
-  //  Serial.println("Sender servoPos til slave");
-
-  //////////////////////////////////////////////////////
 
 
 
@@ -102,33 +99,33 @@ void loop() {
 
 void kast() {
   Serial.println("Kaster");
-  digitalWrite(kastDir, LOW);
+  digitalWrite(dir, LOW);
   digitalWrite(ms1, LOW);
 
-  int KastStep = map(analogRead(potKastStep), 0, 1023, 100, 0);
+  int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);
 
-  for (int i = 0; i < KastStep; i++) {
+  for (int i = 0; i < step; i++) {
 
-    digitalWrite(kastStep, HIGH);
+    digitalWrite(step, HIGH);
     delayMicroseconds(500);
-    digitalWrite(kastStep, LOW);
+    digitalWrite(step, LOW);
     delayMicroseconds(500);
   }
   delay(1000);
 }
 
 void lastProsjektil() {
-  servo.write(100);
+  servo.write(servoNullpunkt);
   delay(1000);
 
-  digitalWrite(kastDir, HIGH);  // Kjører stepperen bakover
-  digitalWrite(ms1, HIGH);      // senker til HALF STEP
+  digitalWrite(dir, HIGH);  // Kjører stepperen bakover
+  digitalWrite(ms1, HIGH);  // senker til HALF STEP
 
   while (digitalRead(endebryter) == HIGH) {
     for (int j = 0; j < 10; j++) {
-      digitalWrite(kastStep, HIGH);
+      digitalWrite(step, HIGH);
       delayMicroseconds(1200);
-      digitalWrite(kastStep, LOW);
+      digitalWrite(step, LOW);
       delayMicroseconds(1200);
     }
     Serial.println("Kjorer til endeposisjon");
@@ -139,20 +136,20 @@ void lastProsjektil() {
 
       if (endebryterNaad == true) {
         //return;
-        digitalWrite(kastDir, LOW);
+        digitalWrite(dir, LOW);
         digitalWrite(ms1, HIGH);
 
         for (int i = 0; i < 30; i++) {  // Kjører litt opp etter endebryteren er nådd.
-          digitalWrite(kastStep, HIGH);
+          digitalWrite(step, HIGH);
           delayMicroseconds(1000);
-          digitalWrite(kastStep, LOW);
+          digitalWrite(step, LOW);
           delayMicroseconds(1000);
         }
         Serial.println("kjorer litt opp");  // Kunne ikke ha denne i for-loopen fordi Arduinoen er for treg (skapte ulyd og lav fart)
       }
       endebryterNaad = !endebryterNaad;
       delay(1000);
-      return;
+      return;  // er denne nødvendig?
     }
   }
 }
