@@ -1,14 +1,21 @@
 #include <Servo.h>
-#include <Wire.h>
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+//                rs en d4 d5 d6 d7
+
+Servo servo;
+int servoPos;
+const int servoNullpunkt = 100;
 
 const int step = 13;
 const int dir = 12;
 const int ms1 = 11;
 
-const int knappKast = 7;
-const int knappLast = 5;
+const int knappLast = 9;
+const int knappKast = 8;
 
-const int endebryter = 3;
+const int endebryter = A2;
 
 const int servoPot = A0;
 const int potKastStep = A1;
@@ -16,19 +23,8 @@ const int potKastStep = A1;
 const float graderPrStep = 1.8;
 float fKastGrader;
 
-Servo servo;
-int servoPos;
-const int servoNullpunkt = 100;
-
-int slaveAdresse = 2;
-
-int data[] = {};
-int dataArrayStorrelse = 2;
- 
-
 unsigned long fortid;
-const int intervallDatasending = 700;
-
+int intervall = 500;
 
 
 void setup() {
@@ -36,18 +32,22 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Programmet starter...");
 
-  Wire.begin();
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Katapult");
 
 
-  for (int i = 10; i <= 13; i++) {
+  for (int i = 11; i <= 13; i++) {
     pinMode(i, OUTPUT);
   }
 
-  servo.attach(9);
+  servo.attach(10);
 
-  for (int j = 3; j <= 8; j++) {
+  for (int j = 8; j <= 9; j++) {
     pinMode(j, INPUT_PULLUP);
   }
+  pinMode(endebryter, INPUT_PULLUP);
 
   pinMode(servoPot, INPUT);
   pinMode(potKastStep, INPUT);
@@ -63,36 +63,34 @@ void loop() {
   int servoPos = map(analogRead(servoPot), 0, 1023, 0, 180);
   servo.write(servoPos);
 
+
   int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);
   float fKastGrader = antStepKast * graderPrStep;
 
-  //Serial.println(data[1]);
 
-  if (naatid - fortid >= intervallDatasending) {
+
+  if (naatid - fortid >= intervall) {
     fortid = naatid;
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Utg.Vinkel ");
+    int iKastGrader = fKastGrader;
+    lcd.print(iKastGrader);
 
-    byte bKastGrader = fKastGrader;
-    byte bServoPos = servoPos;
-    data[0] = bServoPos;
-    data[1] = bKastGrader;
-
-    Wire.beginTransmission(slaveAdresse);
-    Wire.write(data[1]);
-    Wire.endTransmission();
-    Serial.println("Sender bServoPos til slave");
+    lcd.setCursor(0, 1);
+    lcd.print("Retning ");
+    lcd.print(servoPos);
   }
-
-
-
-
-
 
 
   if (digitalRead(knappKast) == LOW) {
     kast();
+    delay(100);
+    Serial.println("Kaster");
   }
 
   if (digitalRead(knappLast) == LOW) {
+
     lastProsjektil();
   }
 }
@@ -104,12 +102,12 @@ void kast() {
 
   int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);
 
-  for (int i = 0; i < step; i++) {
+  for (int i = 0; i < antStepKast; i++) {
 
     digitalWrite(step, HIGH);
-    delayMicroseconds(500);
+    delayMicroseconds(800);
     digitalWrite(step, LOW);
-    delayMicroseconds(500);
+    delayMicroseconds(800);
   }
   delay(1000);
 }
@@ -124,9 +122,9 @@ void lastProsjektil() {
   while (digitalRead(endebryter) == HIGH) {
     for (int j = 0; j < 10; j++) {
       digitalWrite(step, HIGH);
-      delayMicroseconds(1200);
+      delayMicroseconds(1500);
       digitalWrite(step, LOW);
-      delayMicroseconds(1200);
+      delayMicroseconds(1500);
     }
     Serial.println("Kjorer til endeposisjon");
     if (digitalRead(endebryter) == LOW) {
@@ -135,21 +133,10 @@ void lastProsjektil() {
       delay(1000);
 
       if (endebryterNaad == true) {
-        //return;
-        digitalWrite(dir, LOW);
-        digitalWrite(ms1, HIGH);
-
-        for (int i = 0; i < 30; i++) {  // Kjører litt opp etter endebryteren er nådd.
-          digitalWrite(step, HIGH);
-          delayMicroseconds(1000);
-          digitalWrite(step, LOW);
-          delayMicroseconds(1000);
-        }
-        Serial.println("kjorer litt opp");  // Kunne ikke ha denne i for-loopen fordi Arduinoen er for treg (skapte ulyd og lav fart)
+        endebryterNaad = !endebryterNaad;
+        delay(200);
+        return;
       }
-      endebryterNaad = !endebryterNaad;
-      delay(1000);
-      return;  // er denne nødvendig?
     }
   }
 }
