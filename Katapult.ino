@@ -86,7 +86,6 @@ void loop() {
   if (digitalRead(knappKast) == LOW) {
     kast();
     delay(100);
-    Serial.println("Kaster");
   }
 
   if (digitalRead(knappLast) == LOW) {
