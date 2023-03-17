@@ -99,7 +99,7 @@ void kast() {
   digitalWrite(dir, LOW);
   digitalWrite(ms1, LOW);
 
-  int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);
+  int antStepKast = map(analogRead(potKastStep), 0, 1023, 100, 0);        // dette er feil, man får ikke riktig vinkel i grader
 
   for (int i = 0; i < antStepKast; i++) {
 
