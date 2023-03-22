@@ -21,7 +21,7 @@ const float graderPrStep = 1.8;
 float antStep;
 int iAntStep;
 int utgangsvinkel;
-const int delayKast = 900;  // 800 er en bra verdi.
+const int delayKast = 1000;  // 800 er en bra verdi.
 
 bool harKastet = false;
 bool traff = false;
@@ -37,8 +37,6 @@ const float lengdeKasteArm = 0.147;  //[m]
 const float pi = 3.1415;
 float buelengde = 0.0;
 const float mBadeand = 0.005;  // [kg]
-// Buelengde formel: L=2*pi*lengdeKasteArm*(utgangsvinkel/360)
-
 
 unsigned long fortid;
 int intervall = 500;
@@ -46,11 +44,36 @@ int intervall = 500;
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 //                rs en d4 d5 d6 d7
 
+byte katapult[] = {
+  B00011,
+  B00010,
+  B00100,
+  B01000,
+  B10000,
+  B11111,
+  B11011,
+  B11011
+};
+
+byte prosjektil[] = {
+  B00000,
+  B00110,
+  B00110,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B00000
+};
+
 Servo servo;
 int servoPos;
 const int servoNullpunkt = 100;
 
 float tall[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+const String dataNavn[9] = { "Akselerasjonstid", "Total tid", "Flytid", "Akselerasjon", "Kraft", "Utgangshastighet", "Horisontal hastighet", "Utgangshoyde", "Max banehoyde" };
+
+
 
 
 
@@ -62,8 +85,15 @@ void setup() {
 
   lcd.begin(16, 2);
   lcd.clear();
-  lcd.setCursor(0, 0);
+  lcd.setCursor(4, 0);
   lcd.print("Katapult");
+  lcd.createChar(0, katapult);
+  lcd.createChar(1, prosjektil);
+  lcd.setCursor(15, 1);
+  lcd.write(byte(0));
+  lcd.setCursor(13, 1);
+  lcd.write(byte(1));
+
 
 
   for (int i = 11; i <= 13; i++) {
@@ -85,38 +115,24 @@ void setup() {
 
   digitalWrite(ms1, LOW);
 
+  if (hentDistanse() <= 0.0) {
+    Serial.println("Distanse kunne ikke hentes");
+  }
+
   Serial.println("Programmet er startet!");
 }
 
 void loop() {
   unsigned long naatid = millis();
 
-
   int servoPos = map(analogRead(servoPot), 0, 1023, 0, 180);
   servo.write(servoPos);
-
 
   int utgangsvinkel = map(analogRead(potKastStep), 0, 1023, 0, 100);
   antStep = (utgangsvinkel / graderPrStep);
   iAntStep = antStep;
 
   float buelengde = 2.0 * pi * lengdeKasteArm * (utgangsvinkel / 360.0);  // [m]
-
-  hentDistanse();
-  Serial.println(distanse);               
-                                      // Hvorfor leses ikke distanse? 
-
-
-  ////////////////////////////////////////////
-  /*          Seriell Debugging utgangsvinkel, grader osv. 
-  Serial.print("Utgangsvinkel: ");
-  Serial.print(utgangsvinkel);
-  Serial.print("\t");
-  Serial.print("Antall step i int-form: ");
-  Serial.println(iAntStep);
-  */
-  ///////////////////////////////////////////
-
 
   if (naatid - fortid >= intervall) {
     fortid = naatid;
@@ -131,13 +147,13 @@ void loop() {
     lcd.print(servoPos);
   }
 
-
   if (digitalRead(knappKast) == LOW) {
-    hentDistanse();
-    delay(100);
+    distanse = hentDistanse();
+    delay(50);
     Serial.println("Kaster");
+    delay(50);
     kast();
-    delay(100);
+    delay(50);
   }
 
   if (digitalRead(knappLast) == LOW) {
@@ -148,12 +164,8 @@ void loop() {
     if (digitalRead(sjokksensor) == LOW) {
       t2 = millis();
       Serial.println("Treff");
-      harKastet = !harKastet;
-      delay(1000);
 
       beregninger(t0, t1, t2, buelengde, distanse, utgangsvinkel, mBadeand, lengdeKasteArm, pi);
-
-
 
     } else if (digitalRead(sjokksensor) == HIGH && millis() >= t1 + timeout) {
       Serial.println("Du bomma");
@@ -166,10 +178,8 @@ void loop() {
 
 
 void kast() {
-  // Serial.println("Kaster");
   digitalWrite(dir, LOW);
   digitalWrite(ms1, LOW);
-
 
   t0 = millis();
 
@@ -222,7 +232,6 @@ void lastProsjektil() {
 
 float hentDistanse() {
 
-  float distanse = 0;
   unsigned int tid = 0;
 
   digitalWrite(trigPin, HIGH);
@@ -236,20 +245,18 @@ float hentDistanse() {
   return distanse;  // returnerer distanse [m]
 }
 
-float beregninger(float t0, float t1, float t2, float buelengde, float distanse, float utgangsvinkel, float mBadeand, float lengdeKasteArm, float pi) {
-  Serial.println("Starter beregninger");
-  //Serial.println(buelengde);
+float beregninger(long t0, long t1, long t2, float buelengde, float distanse, float utgangsvinkel, float mBadeand, float lengdeKasteArm, float pi) {
+  Serial.println("Starter beregninger...");
 
-  float aksTid = (t1 - t0) / 1000.0;                                                                                                         // [s]
-  float totTid = (t2 - t0) / 1000.0;                                                                                                         // [s]
-  float flytid = (t2 - t1) / 1000.0;                                                                                                         // [s]
-  float akselerasjon = (2.0 * ( (buelengde) - (aksTid)) ) / pow(aksTid, 2);                                                    // [m/s^2]
-  float Fkast = mBadeand * akselerasjon;                                                                                                     // [N]
-  float utgangshastighet = akselerasjon * (aksTid);                                                                                         // [m/s]
-  float horisontalHastighet = distanse / (flytid);                                                                                          // [m/s]
-  float utgangshoyde = ((lengdeKasteArm * 1000.0) * sin(utgangsvinkel * (pi / 180))) + 0.1;                                                  // [m] over bakken    (0.1 er høyde til omdreiningspunkt)
-  float maxBanehoyde = (pow(utgangshastighet, 2) * pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81);                              // [m]
-  float hoydePaaTreff = maxBanehoyde + (utgangshastighet * (sin(utgangsvinkel * (pi / 180.0)))) * flytid - (0.5) * 9.81 * pow(flytid, 2.0);  // [m]   formel: h = h_max + (v_i * sin(theta)) * t - (1/2) * g * t^2
+  float aksTid = (t1 - t0) / 1000.0;                                                                             // [s]
+  float totTid = (t2 - t0) / 1000.0;                                                                             // [s]
+  float flytid = (t2 - t1) / 1000.0;                                                                             // [s]
+  float akselerasjon = (2.0 * ((buelengde) - (aksTid))) / pow(aksTid, 2);                                        // [m/s^2]
+  float Fkast = mBadeand * akselerasjon;                                                                         // [N]
+  float utgangshastighet = akselerasjon * (aksTid);                                                              // [m/s]
+  float horisontalHastighet = distanse / (flytid);                                                               // [m/s]
+  float utgangshoyde = lengdeKasteArm * sin(utgangsvinkel * (pi / 180)) + 0.1;                                   // [m] over bakken    (0.1 er høyde til omdreiningspunkt)
+  float maxBanehoyde = (pow(utgangshastighet, 2) * pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81);  // [m]
 
   tall[0] = aksTid;
   tall[1] = totTid;
@@ -260,14 +267,41 @@ float beregninger(float t0, float t1, float t2, float buelengde, float distanse,
   tall[6] = horisontalHastighet;
   tall[7] = utgangshoyde;
   tall[8] = maxBanehoyde;
-  tall[9] = hoydePaaTreff;
 
-  // Serial.println("Fkast = \t " + String(Fkast) + "\t [N]");
-  //Serial.println(distanse);
-
-  delay(2000);
-
-  // Formater alt i et array
+  for (int i = 0; i <= 8; i++) {
+    Serial.print(dataNavn[i] + "\t" + tall[i]);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(dataNavn[i]);
+    lcd.setCursor(0, 1);
+    lcd.print(tall[i]);
+    switch (i) {
+      case 0 ... 2:
+        Serial.print(" [s]");
+        lcd.print("         [s]");
+        break;
+      case 3:
+        Serial.print(" [m/s^2]");
+        lcd.print("    [m/s^2]");
+        break;
+      case 4:
+        Serial.print(" [N]");
+        lcd.print("         [N]");
+        break;
+      case 5 ... 6:
+        Serial.print(" [m/s]");
+        lcd.print("       [m/s]");
+        break;
+      case 7 ... 8:
+        Serial.print(" [m]");
+        lcd.print("         [m]");
+        break;
+    }
+    Serial.println();
+    delay(3000);
+  }
+  lcd.clear();
+  harKastet = !harKastet;
 }
 
 
