@@ -1,8 +1,38 @@
-#include <Servo.h>
-#include <LiquidCrystal.h>
+/*
+  Filnavn: Katapult.ino
+  Versjon: V1.0
+  Revisjon: V1.0 -29.03.23 - Første versjon - Kenneth Paulsen
+
+  Program: Programmet er laget for å kaste en badeand fra Privat Bar på Kongsberg. Det mekaniske designet er slik at konstruksjonen er en elektrisk katapult.
+  Katapulten styres ved to potmetre som stiller inn retning (servomotor) og utgangsvinkel på badeanden, altså hvor mange grader steppermotoren går før den 
+  bråstopper. For å finne nullpunkt på steppermotoren kjøres katapultarmen til en endebryteren fra den gamle stekeovnen min. 
+
+  Det er koblet en sjokksensor med lang ledning til Arduinoen. Om denne sjokksensoren registrerer rørelse har badeanden truffet målet! 
+  Om så skjer starter en funksjon jeg har kalt "beregninger". Denne får noe data fra selve kastet og beregner teoretisk data angående badeandens 
+  bane, flyvetid osv. De beregnede verdiene sendes til seriell monitor og en LCD-skjerm. 
+
+  Datablad og info: 
+  Sjokksensor:      https://www.velleman.eu/downloads/29/vma312_a4v01.pdf
+  Stepperdriver:    https://learn.sparkfun.com/tutorials/big-easy-driver-hookup-guide?_ga=2.226144732.75772450.1679860848-749363297.1654960242 
+  Stepperdriver IC: https://cdn.sparkfun.com/datasheets/Robotics/A4988-Datasheet.pdf
+  Steppermotor:     https://www.elfadistrelec.no/Web/Downloads/_t/ds/SF2421-10B41_eng_tds.pdf
+  Servomotor:       http://myosuploads3.banggood.com/products/20220907/20220907032153DS3225datasheet.pdf
+  Avstandssensor:   https://datasheetspdf.com/pdf-file/813041/ETC/HY-SRF05/1
+  5V:               https://www.elfadistrelec.no/Web/Downloads/xc/_e/teL78xx-L78xxC_e.pdf
+  6V:               https://4donline.ihs.com/images/VipMasterIC/IC/SGST/SGST-S-A0006334694/SGST-S-A0006334694-1.pdf?hkey=52A5661711E402568146F3353EA87419
+  24V:              https://www.kjell.com/globalassets/mediaassets/822048_45198_manual_en_no_sv.pdf?ref=F6866994D3
+  Kondensatorer:    Ukjent sett fra Kina
+  Micro/endebryter: Umerket fra Bosch stekeovn
+  Avstandssensor:   Umerket avart av HC-SR04 eller lignende https://docs.rs-online.com/8bc5/A700000007388293.pdf
+  Konstruksjon:     3D-printet med PLA.
+
+*/
+
+#include <Servo.h>                                          // Inkluderer biblioteket Servo.h
+#include <LiquidCrystal.h>                                  // Inkluderer biblioteket LiquidCrystal.h
 
 //                rs en d4 d5 d6 d7
-LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);                        // Setter opp LCD-skjermen 
 
 Servo servo;
 
@@ -241,15 +271,16 @@ void beregninger(long t0, long t1, long t2, float buelengde, float distanse, int
 
   Serial.println("Starter beregninger...");
   Serial.println("Data inn til funksjonen: \n");
-  Serial.println("t0         \t" + String(t0));
-  Serial.println("t1         \t" + String(t1));
-  Serial.println("t2         \t" + String(t2));
-  Serial.println("Buelengde  \t" + String(buelengde));
-  Serial.println("Distanse   \t" + String(distanse));
-  Serial.println("Utg.vink   \t" + String(utgangsvinkel));
-  Serial.println("mBadeand   \t" + String(mBadeand));
-  Serial.println("lengdeKArm \t" + String(lengdeKasteArm));
+  Serial.println("t0         \t" + String(t0) + " [ms]");
+  Serial.println("t1         \t" + String(t1) + " [ms]");
+  Serial.println("t2         \t" + String(t2) + " [ms]");
+  Serial.println("Buelengde  \t" + String(buelengde) + " [m]");
+  Serial.println("Distanse   \t" + String(distanse) + " [m]");
+  Serial.println("Utg.vink   \t" + String(utgangsvinkel) + "   [*]");
+  Serial.println("mBadeand   \t" + String(mBadeand) + " [g]");
+  Serial.println("lengdeKArm \t" + String(lengdeKasteArm) + " [m]");
   Serial.println("pi         \t" + String(pi) + "\n");
+
 
 
   float tall[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -264,17 +295,21 @@ void beregninger(long t0, long t1, long t2, float buelengde, float distanse, int
   , "Utgangshoyde        "
   , "Max banehoyde       " };
 
-
   float aksTid = (t1 - t0) / 1000.0;                                                                             // [s]
   float totTid = (t2 - t0) / 1000.0;                                                                             // [s]
   float flytid = (t2 - t1) / 1000.0;                                                                             // [s]
-  float akselerasjon = (2.0 * (buelengde - aksTid)) / pow(aksTid, 2);                                            // [m/s^2]
+  float vinkelRadiusRad = utgangsvinkel * (pi/180);                                                              // [rad]
+  float vinkelhastighet = vinkelRadiusRad / aksTid;                                                              // [rad/s]
+  float vinkelakselerasjon = vinkelhastighet / aksTid;                                                           // [rad/s^2]
+  float akselerasjon = lengdeKasteArm * vinkelakselerasjon;                                                      // [m/s^2]   Vinkelakselerasjon
+  //float akselerasjonRettlinjet = (2.0 * (buelengde - aksTid)) / pow(aksTid, 2);                                // [m/s^2]   Rettlinjet akselerasjon, som blir feil å bruke
   float Fkast = (mBadeand / 1000) * akselerasjon;                                                                // [N]
   float utgangshastighet = akselerasjon * (aksTid);                                                              // [m/s]
   float horisontalHastighet = distanse / (flytid);                                                               // [m/s]
   float utgangshoyde = lengdeKasteArm * sin(utgangsvinkel * (pi / 180)) + 0.1;                                   // [m] over bakken    (0.1 er høyde til omdreiningspunkt)
   float maxBanehoyde = (pow(utgangshastighet, 2) * pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81);  // [m]
 
+  // Serial.println(akselerasjonRettlinjet);
   tall[0] = aksTid;
   tall[1] = totTid;
   tall[2] = flytid;
