@@ -1,7 +1,10 @@
 /*
   Filnavn: Katapult.ino
   Versjon: V1.0
-  Revisjon: V1.0 - 28.03.23 - Første versjon - Kenneth Paulsen FTMEN3
+  Revisjon: V2.0 - 29.03.23 - Første versjon - Kenneth Paulsen FTMEN3
+
+    Revidert siden videoinnspilling:
+    - Rettet feil i ligning for maxBanehoyde
 
   Program: Programmet er laget for å katapultere en badeand fra Privat Bar på Kongsberg. Det mekaniske designet er slik at konstruksjonen ligner en 
   elektrisk katapult.
@@ -13,9 +16,9 @@
   bane, flyvetid osv. De beregnede verdiene sendes til seriell monitor i fint leselig format og en LCD-skjerm. 
  
   DISCLAIMER: 
-  Angående beregningene så er luftmotstand ikke tatt i betraktning og akselerasjonen beregnes/måles på feil måte. 
+  Angående beregningene så er luftmotstand ikke tatt i betraktning og akselerasjonen beregnes/måles på en uegnet måte 
   Det hadde vært bedre å måle akselerasjonen med et potmeter eller lignenede. Slik den beregnes nå sier jeg at den akselererer gjennom hele kastet mens den i virkeligheten akselererer 
-  i en- kanskje to step før den har tilnærmet konstant fart til den når enden av For-loopen.
+  i to- kanskje tre step før den har tilnærmet konstant fart til den når enden av For-loopen.
   Til sammenligning kan en Tesla Model S Plaid akselerere fra 0 til 100 på 2,07s. ~> 48,3 m/s^2
 
 
@@ -309,8 +312,9 @@ void beregninger(long t0, long t1, long t2, float distanse, int utgangsvinkel) {
   float utgangshastighet = akselerasjon * (aksTid);                                                              // [m/s]     Utfører matte med variablene, lagrer i float
   float horisontalHastighet = distanse / (flytid);                                                               // [m/s]     Utfører matte med variablene, lagrer i float
   float utgangshoyde = lengdeKatapultarm * sin(utgangsvinkel * (pi / 180)) + 0.1;                                // [m]       over bakken (0.1 er høyde til omdreiningspunkt) Utfører matte med variablene, lagrer i float
-  float maxBanehoyde = (pow(utgangshastighet, 2) * pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81);  // [m]       Utfører matte med variablene, lagrer i float
-            
+  //float maxBanehoyde = pow(utgangshastighet, 2) * ( pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81) + utgangshoyde;  // [m]       Utfører matte med variablene, lagrer i float
+  float maxBanehoyde = utgangshoyde + (pow(utgangshastighet, 2) * ( pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81) );
+
   tall[0] = aksTid;                                                 // Lagrer variabelen i arrayet på plass 0
   tall[1] = totTid;                                                 // Lagrer variabelen i arrayet på plass 1
   tall[2] = flytid;                                                 // Lagrer variabelen i arrayet på plass 2
