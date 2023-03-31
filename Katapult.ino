@@ -1,24 +1,23 @@
 /*
   Filnavn: Katapult.ino
   Versjon: V1.0
-  Revisjon: V2.0 - 29.03.23 - Første versjon - Kenneth Paulsen FTMEN3
-
-    Revidert siden videoinnspilling:
-    - Rettet feil i ligning for maxBanehoyde
+  Revisjon: V1.0 - 31.03.23 - Første versjon - Kenneth Paulsen FTMEN3
 
   Program: Programmet er laget for å katapultere en badeand fra Privat Bar på Kongsberg. Det mekaniske designet er slik at konstruksjonen ligner en 
   elektrisk katapult.
   Katapulten styres ved to potmetre som stiller inn retning (servomotor) og utgangsvinkel på badeanden, altså hvor mange grader steppermotoren går før den 
-  bråstopper. For å finne nullpunkt på steppermotoren kjøres katapultarmen til en endebryteren fra den gamle stekeovnen min. 
+  bråstopper. For å finne nullpunkt på steppermotoren kjøres katapultarmen til en endebryteren fra den gamle stekeovnen min.
 
   Det er koblet en sjokksensor med lang ledning til Arduinoen. Om denne sjokksensoren registrerer rørelse om badeanden treffer målet! 
   Om så skjer starter en funksjon jeg har kalt "beregninger". Denne får noe data fra selve kastet og beregner teoretisk data angående badeandens 
   bane, flyvetid osv. De beregnede verdiene sendes til seriell monitor i fint leselig format og en LCD-skjerm. 
+  Den horisontale avstanden til målet måles med en ultrasonisk sensor. Om jeg hadde hatt mer tid kunne det vært gøy å "finne" målet med denne for så å 
+  kaste badeanda automatisk når målet var i sikte og innenfor rekkevidde. 
  
   DISCLAIMER: 
-  Angående beregningene så er luftmotstand ikke tatt i betraktning og akselerasjonen beregnes/måles på en uegnet måte 
-  Det hadde vært bedre å måle akselerasjonen med et potmeter eller lignenede. Slik den beregnes nå sier jeg at den akselererer gjennom hele kastet mens den i virkeligheten akselererer 
-  i to- kanskje tre step før den har tilnærmet konstant fart til den når enden av For-loopen.
+  Angående beregningene så er luftmotstand ikke tatt i betraktning og akselerasjonen beregnes/måles på en uegnet måte, noe som kan gi følgefeil i beregningene.
+  Det hadde vært bedre å måle akselerasjonen med et potmeter eller lignenede. Slik den beregnes nå sier jeg at den akselererer gjennom hele kastet mens den 
+  i virkeligheten akselererer i to- kanskje tre step før den har tilnærmet konstant fart, til den når enden av For-loopen.
   Til sammenligning kan en Tesla Model S Plaid akselerere fra 0 til 100 på 2,07s. ~> 48,3 m/s^2
 
 
@@ -135,10 +134,6 @@ void setup() {                                              // Setup starter, ko
 
   digitalWrite(ms1, LOW);                                   // Setter ms1 på stepperdriveren LOW. Slik at man får FULL STEP på motoren
 
-  if (hentDistanse() <= 0.0) {                              // hvis den returnerte vedien fra funksjonen er mindre enn 0.0, gjøres følgende.
-    Serial.println("Distanse kunne ikke hentes");           // Printer tekst + linjeskift i seriell monitor
-  }                                                         // if SLUTT
-
   Serial.println("Programmet er startet!");                 // Printer tekst + linjeskift i seriell monitor
 }                                                           // Void Setup SLUTT
 
@@ -182,7 +177,7 @@ void loop() {                                                                   
       t2 = millis();                                                                    // lagrer den returnerte verdien fra millis() i t2
       Serial.println("Treff");                                                          // Printer tekst + linjeskift i seriell monitor
 
-      beregninger(t0, t1, t2, distanse, utgangsvinkel);// Starter funksjonen beregninger og sender med en hel rekke variabler
+      beregninger(t0, t1, t2, distanse, utgangsvinkel);                                 // Starter funksjonen beregninger og sender med en hel rekke variabler
 
     } else if (digitalRead(sjokksensor) == HIGH && millis() >= t1 + timeout) {          // Hvis sjokksensoren er høy OG den returnerte verdien fra millis() er større enn (t1 + variabelen timeout)
       Serial.println("Du bomma");                                                       // Printer tekst + linjeskift i seriell monitor
@@ -193,30 +188,7 @@ void loop() {                                                                   
   }                                                                                     // if SLUTT
 }                                                                                       // Void loop SLUTT
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////EGNE FUNKSJONER///////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void kast() {                                                // Funksjonen kast(), kaster badeanden og oppdaterer t1 og t2
-
-  digitalWrite(dir, LOW);                                    // Setter retning på steppermotoren
-  digitalWrite(ms1, LOW);                                    // Setter ms1 lav slik at man får FULL STEP
-  Serial.println(String(iAntStep) + " step");                // Printer en omgjort iAntStep til String + tekst + linjeskift 
-
-  t0 = millis();                                             // Setter t0 til den returnerte verdien fra millis()
-
-  for (int l = 0; l <= iAntStep; l++) {                      // For-loop med tellevariabel l. Kjører så lenge l er mindre eller lik variabelen iAntStep
-    digitalWrite(step, HIGH);                                // Sender høy puls til stepperdirveren
-    delayMicroseconds(delayKast);                            // Venter
-    digitalWrite(step, LOW);                                 // Sender høy puls til stepperdirveren
-    delayMicroseconds(delayKast);                            // Venter
-  }                                                          // For-loop SLUTT
-
-  t1 = millis();                                             // Setter t1 til den returnerte verdien fra millis()
-
-  harKastet = true;                                          // Setter variabelen harKastet til sann
-}                                                            // kast() SLUTT
-
 
 void lastProsjektil() {                                             // Funksjonen lastProsjektil() skal kjøre servoen og steppermotoren til endebryteren, slik at utgngspunktet for hvert kast blir likt 
   Serial.println("Kjorer til endeposisjon");                        // Printer tekst + linjeskift.  Kunne ikke ha denne inne i for-loopen pga. treghet og støy.
@@ -253,7 +225,6 @@ void lastProsjektil() {                                             // Funksjone
   }                                                                 // while SLUTT
 }                                                                   // lastProsjektil() SLUTT
 
-
 float hentDistanse() {                                        // Funksjonen hentDistanse, skal måle distansen til målet og returnere distansen til hvem-enn som spør 
 
   unsigned int tid = 0;                                       // Variabel som holder på tiden
@@ -269,9 +240,28 @@ float hentDistanse() {                                        // Funksjonen hent
   return distanse;                                            // returnerer distanse [m]                      
 }                                                             // float hentDistanse() SLUTT
 
+bool kast() {                                                // Funksjonen kast(), kaster badeanden og oppdaterer t1 og t2
 
-void beregninger(long t0, long t1, long t2, float distanse, int utgangsvinkel) { // Funksjonen som beregner og viser data i monitor og på LCD. Alle data ut blir teoretiske da jeg ikke har noe feedback. Luftmotstand på badeanda er heller ikke medregnet
-  Serial.println("Starter beregninger...");                                      // Printer tekst + linjeskift i seriell monitor
+  digitalWrite(dir, LOW);                                    // Setter retning på steppermotoren
+  digitalWrite(ms1, LOW);                                    // Setter ms1 lav slik at man får FULL STEP
+  Serial.println(String(iAntStep) + " step");                // Printer en omgjort iAntStep til String + tekst + linjeskift 
+
+  t0 = millis();                                             // Setter t0 til den returnerte verdien fra millis()
+
+  for (int l = 0; l <= iAntStep; l++) {                      // For-loop med tellevariabel l. Kjører så lenge l er mindre eller lik variabelen iAntStep
+    digitalWrite(step, HIGH);                                // Sender høy puls til stepperdirveren
+    delayMicroseconds(delayKast);                            // Venter
+    digitalWrite(step, LOW);                                 // Sender høy puls til stepperdirveren
+    delayMicroseconds(delayKast);                            // Venter
+  }                                                          // For-loop SLUTT
+
+  t1 = millis();                                             // Setter t1 til den returnerte verdien fra millis()
+
+  return harKastet = true;                                   // Setter variabelen harKastet til sann
+}                                                            // bool kast() SLUTT
+
+bool beregninger(long t0, long t1, long t2, float distanse, int utgangsvinkel) { // Funksjonen som beregner og viser data i monitor og på LCD. Alle data ut blir teoretiske da jeg ikke har noe feedback. Luftmotstand på badeanda er heller ikke medregnet
+  Serial.println("Starter beregninger... \n");                                      // Printer tekst + linjeskift i seriell monitor
   
   const float mBadeand = 5.0;  // [g]                                           // Konstant variabel som holder badeandens vekt i gram
   const float pi = 3.1415;                                                      // Konstant variabel.  pi
@@ -312,8 +302,7 @@ void beregninger(long t0, long t1, long t2, float distanse, int utgangsvinkel) {
   float utgangshastighet = akselerasjon * (aksTid);                                                              // [m/s]     Utfører matte med variablene, lagrer i float
   float horisontalHastighet = distanse / (flytid);                                                               // [m/s]     Utfører matte med variablene, lagrer i float
   float utgangshoyde = lengdeKatapultarm * sin(utgangsvinkel * (pi / 180)) + 0.1;                                // [m]       over bakken (0.1 er høyde til omdreiningspunkt) Utfører matte med variablene, lagrer i float
-  //float maxBanehoyde = pow(utgangshastighet, 2) * ( pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81) + utgangshoyde;  // [m]       Utfører matte med variablene, lagrer i float
-  float maxBanehoyde = utgangshoyde + (pow(utgangshastighet, 2) * ( pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81) );
+  float maxBanehoyde = utgangshoyde + ( pow(utgangshastighet, 2) * ( pow(sin(utgangsvinkel * (pi / 180.0)), 2.0)) / (2.0 * 9.81) );
 
   tall[0] = aksTid;                                                 // Lagrer variabelen i arrayet på plass 0
   tall[1] = totTid;                                                 // Lagrer variabelen i arrayet på plass 1
@@ -364,8 +353,8 @@ void beregninger(long t0, long t1, long t2, float distanse, int utgangsvinkel) {
   }                                                                 // For-loop SLUTT
   lcd.clear();                                                      // Sletter alt som var på LCD-skjermen
 
-  harKastet = !harKastet;                                           // Inverterer variablen 1->0 eller 0->1
-}                                                                   // Void beregninger SLUTT
+  return harKastet = !harKastet;                                    // Returnerer nverterert variable 1 -> 0 eller 0 -> 1
+}                                                                   // bool beregninger SLUTT
 
 
 
